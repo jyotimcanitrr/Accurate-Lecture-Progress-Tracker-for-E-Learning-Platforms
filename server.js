@@ -22,7 +22,11 @@ const progressSchema = new mongoose.Schema({
     end: Number
   }],
   lastPosition: Number,
-  totalProgress: Number
+  totalProgress: Number,
+  lastUpdated: {
+    type: Date,
+    default: Date.now
+  }
 });
 
 const Progress = mongoose.model('Progress', progressSchema);
@@ -31,42 +35,34 @@ app.post('/api/progress', async (req, res) => {
   try {
     const { userId, videoId, watchedIntervals, lastPosition, totalProgress } = req.body;
     
-    let progress = await Progress.findOne({ userId, videoId });
-    
-    if (progress) {
-      progress.watchedIntervals = watchedIntervals;
-      progress.lastPosition = lastPosition;
-      progress.totalProgress = totalProgress;
-    } else {
-      progress = new Progress({
-        userId,
-        videoId,
+    const progress = await Progress.findOneAndUpdate(
+      { userId, videoId },
+      {
         watchedIntervals,
         lastPosition,
-        totalProgress
-      });
-    }
+        totalProgress,
+        lastUpdated: new Date()
+      },
+      { upsert: true, new: true }
+    );
     
-    await progress.save();
     res.json(progress);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/api/progress/:userId/:videoId', async (req, res) => {
   try {
-    const progress = await Progress.findOne({
-      userId: req.params.userId,
-      videoId: req.params.videoId
-    });
+    const { userId, videoId } = req.params;
+    const progress = await Progress.findOne({ userId, videoId });
     res.json(progress || { watchedIntervals: [], lastPosition: 0, totalProgress: 0 });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 }); 

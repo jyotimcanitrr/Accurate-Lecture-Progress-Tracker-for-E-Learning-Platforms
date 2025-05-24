@@ -1,144 +1,176 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ReactPlayer from 'react-player';
-import { Box, LinearProgress, Typography } from '@mui/material';
-import axios from 'axios';
+import './VideoPlayer.css';
 
-const VideoPlayer = ({ videoUrl, userId, videoId }) => {
-  const [watchedIntervals, setWatchedIntervals] = useState([]);
-  const [currentProgress, setCurrentProgress] = useState(0);
-  const [lastPosition, setLastPosition] = useState(0);
+const VideoPlayer = ({ videoUrl, onProgressUpdate, onDurationUpdate }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [watchingIntervals, setWatchingIntervals] = useState([]);
+  const [error, setError] = useState(null);
   const playerRef = useRef(null);
-  const currentIntervalRef = useRef(null);
+  const intervalStartRef = useRef(null);
+  const timeUpdateIntervalRef = useRef(null);
+
+  // Function to extract YouTube video ID
+  const getYouTubeVideoId = (url) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
 
   useEffect(() => {
-    const loadProgress = async () => {
-      try {
-        console.log('Loading progress for:', userId, videoId);
-        const response = await axios.get(`http://localhost:5000/api/progress/${userId}/${videoId}`);
-        console.log('Loaded progress:', response.data);
-        if (response.data) {
-          setWatchedIntervals(response.data.watchedIntervals || []);
-          setLastPosition(response.data.lastPosition || 0);
-          setCurrentProgress(response.data.totalProgress || 0);
+    // Load YouTube IFrame API
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // Initialize YouTube player when API is ready
+    window.onYouTubeIframeAPIReady = () => {
+      const videoId = getYouTubeVideoId(videoUrl);
+      if (!videoId) {
+        setError('Invalid YouTube URL. Please provide a valid YouTube video URL.');
+        return;
+      }
+
+      playerRef.current = new window.YT.Player('youtube-player', {
+        height: '360',
+        width: '640',
+        videoId: videoId,
+        playerVars: {
+          'playsinline': 1,
+          'controls': 1
+        },
+        events: {
+          'onReady': onPlayerReady,
+          'onStateChange': onPlayerStateChange,
+          'onError': onPlayerError
         }
-      } catch (error) {
-        console.error('Error loading progress:', error);
-      }
-    };
-    loadProgress();
-  }, [userId, videoId]);
-
-  useEffect(() => {
-    const saveProgress = async () => {
-      try {
-        console.log('Saving progress:', {
-          userId,
-          videoId,
-          watchedIntervals,
-          lastPosition,
-          totalProgress: currentProgress
-        });
-        await axios.post('http://localhost:5000/api/progress', {
-          userId,
-          videoId,
-          watchedIntervals,
-          lastPosition,
-          totalProgress: currentProgress
-        });
-        console.log('Progress saved successfully');
-      } catch (error) {
-        console.error('Error saving progress:', error);
-      }
+      });
     };
 
-    const interval = setInterval(saveProgress, 5000); // Save every 5 seconds
-    return () => clearInterval(interval);
-  }, [userId, videoId, watchedIntervals, lastPosition, currentProgress]);
+    return () => {
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current);
+      }
+      if (playerRef.current) {
+        playerRef.current.destroy();
+      }
+    };
+  }, [videoUrl]);
 
-  const mergeIntervals = (intervals) => {
-    if (intervals.length === 0) return [];
-    
-    intervals.sort((a, b) => a.start - b.start);
-    const merged = [intervals[0]];
-    
-    for (let i = 1; i < intervals.length; i++) {
-      const current = intervals[i];
-      const previous = merged[merged.length - 1];
+  const onPlayerReady = (event) => {
+    const duration = event.target.getDuration();
+    setDuration(duration);
+    onDurationUpdate(duration); // Notify parent component about duration
+    console.log('Video duration:', duration);
+  };
+
+  const onPlayerStateChange = (event) => {
+    // YouTube player states: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (video cued)
+    if (event.data === window.YT.PlayerState.PLAYING) {
+      setIsPlaying(true);
+      intervalStartRef.current = event.target.getCurrentTime();
       
-      if (current.start <= previous.end) {
-        previous.end = Math.max(previous.end, current.end);
-      } else {
-        merged.push(current);
+      // Start time update interval
+      timeUpdateIntervalRef.current = setInterval(() => {
+        if (playerRef.current && playerRef.current.getPlayerState() === window.YT.PlayerState.PLAYING) {
+          const currentTime = playerRef.current.getCurrentTime();
+          setCurrentTime(currentTime);
+          console.log('Current time:', currentTime);
+        }
+      }, 1000);
+    } else if (event.data === window.YT.PlayerState.PAUSED) {
+      setIsPlaying(false);
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current);
+      }
+      
+      if (intervalStartRef.current !== null) {
+        const newInterval = {
+          start: intervalStartRef.current,
+          end: event.target.getCurrentTime()
+        };
+        setWatchingIntervals(prev => [...prev, newInterval]);
+        onProgressUpdate([...watchingIntervals, newInterval]);
+      }
+    } else if (event.data === window.YT.PlayerState.ENDED) {
+      setIsPlaying(false);
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current);
+      }
+      
+      if (intervalStartRef.current !== null) {
+        const newInterval = {
+          start: intervalStartRef.current,
+          end: event.target.getDuration()
+        };
+        setWatchingIntervals(prev => [...prev, newInterval]);
+        onProgressUpdate([...watchingIntervals, newInterval]);
       }
     }
+  };
+
+  const onPlayerError = (event) => {
+    let errorMessage = 'Error loading video. ';
+    switch (event.data) {
+      case 2:
+        errorMessage += 'Invalid video ID.';
+        break;
+      case 5:
+        errorMessage += 'HTML5 player error.';
+        break;
+      case 100:
+        errorMessage += 'Video not found or has been removed.';
+        break;
+      case 101:
+      case 150:
+        errorMessage += 'Video embedding not allowed.';
+        break;
+      default:
+        errorMessage += 'Please check if the video URL is correct and accessible.';
+    }
+    setError(errorMessage);
+  };
+
+  const togglePlay = () => {
+    if (!playerRef.current) return;
     
-    return merged;
-  };
-
-  const calculateProgress = (intervals, duration) => {
-    if (!duration) return 0;
-    const totalWatched = intervals.reduce((acc, interval) => acc + (interval.end - interval.start), 0);
-    const progress = (totalWatched / duration) * 100;
-    console.log('Calculated progress:', progress, '%');
-    return progress;
-  };
-
-  const handlePlay = () => {
-    console.log('Video started playing');
-    setIsPlaying(true);
-    currentIntervalRef.current = {
-      start: playerRef.current.getCurrentTime(),
-      end: playerRef.current.getCurrentTime()
-    };
-  };
-
-  const handlePause = () => {
-    console.log('Video paused');
-    setIsPlaying(false);
-    if (currentIntervalRef.current) {
-      currentIntervalRef.current.end = playerRef.current.getCurrentTime();
-      console.log('Current interval:', currentIntervalRef.current);
-      const newIntervals = mergeIntervals([...watchedIntervals, currentIntervalRef.current]);
-      console.log('Merged intervals:', newIntervals);
-      setWatchedIntervals(newIntervals);
-      setCurrentProgress(calculateProgress(newIntervals, playerRef.current.getDuration()));
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+    } else {
+      playerRef.current.playVideo();
     }
   };
 
-  const handleProgress = (state) => {
-    if (isPlaying && currentIntervalRef.current) {
-      currentIntervalRef.current.end = state.playedSeconds;
-    }
-    setLastPosition(state.playedSeconds);
-  };
+  if (error) {
+    return (
+      <div className="video-error">
+        <p>{error}</p>
+        <p className="error-tip">Tips:</p>
+        <ul>
+          <li>Make sure the YouTube video URL is correct</li>
+          <li>Check if the video is publicly accessible</li>
+          <li>Try using a different YouTube video URL</li>
+          <li>Make sure the video allows embedding</li>
+        </ul>
+      </div>
+    );
+  }
 
   return (
-    <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto', p: 2 }}>
-      <ReactPlayer
-        ref={playerRef}
-        url={videoUrl}
-        width="100%"
-        height="auto"
-        controls
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onProgress={handleProgress}
-        progressInterval={1000}
-        playing={isPlaying}
-        initialTime={lastPosition}
-      />
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          Progress: {currentProgress.toFixed(1)}%
-        </Typography>
-        <LinearProgress 
-          variant="determinate" 
-          value={currentProgress} 
-          sx={{ mt: 1, height: 10, borderRadius: 5 }}
-        />
-      </Box>
-    </Box>
+    <div className="video-player">
+      <div id="youtube-player"></div>
+      <div className="video-controls">
+        <button onClick={togglePlay}>
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <div className="progress-info">
+          <span>Current Time: {Math.floor(currentTime)}s</span>
+          <span>Duration: {Math.floor(duration)}s</span>
+        </div>
+      </div>
+    </div>
   );
 };
 

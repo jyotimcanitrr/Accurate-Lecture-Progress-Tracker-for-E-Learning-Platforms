@@ -1,27 +1,60 @@
-import React from 'react';
-import { Container, Typography, Box } from '@mui/material';
+import React, { useState } from 'react';
 import VideoPlayer from './components/VideoPlayer';
+import ProgressTracker from './components/ProgressTracker';
+import VideoInput from './components/VideoInput';
+import './App.css';
 
 function App() {
-  // For demo purposes, we're using hardcoded values
-  // In a real application, these would come from your authentication system
-  const userId = 'user123';
-  const videoId = 'video123';
-  const videoUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'; // Example video URL
+  const [watchingIntervals, setWatchingIntervals] = useState([]);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+
+  const handleProgressUpdate = (intervals) => {
+    setWatchingIntervals(intervals);
+  };
+
+  const handleDurationUpdate = (duration) => {
+    setVideoDuration(duration);
+  };
+
+  const handleVideoSubmit = (url) => {
+    setVideoUrl(url);
+    setIsVideoLoaded(true);
+    // Reset progress when loading new video
+    setWatchingIntervals([]);
+    setVideoDuration(0);
+  };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom align="center">
-          Lecture Progress Tracker
-        </Typography>
-        <VideoPlayer
-          videoUrl={videoUrl}
-          userId={userId}
-          videoId={videoId}
-        />
-      </Box>
-    </Container>
+    <div className="App">
+      <header className="App-header">
+        <h1>Lecture Progress Tracker</h1>
+      </header>
+      <main>
+        {!isVideoLoaded ? (
+          <VideoInput onSubmit={handleVideoSubmit} />
+        ) : (
+          <>
+            <VideoPlayer 
+              videoUrl={videoUrl}
+              onProgressUpdate={handleProgressUpdate}
+              onDurationUpdate={handleDurationUpdate}
+            />
+            <ProgressTracker 
+              intervals={watchingIntervals}
+              duration={videoDuration}
+            />
+            <button 
+              className="change-video-btn"
+              onClick={() => setIsVideoLoaded(false)}
+            >
+              Change Video
+            </button>
+          </>
+        )}
+      </main>
+    </div>
   );
 }
 
