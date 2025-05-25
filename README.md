@@ -31,7 +31,7 @@ npm install
 
 3. Install frontend dependencies:
 ```bash
-cd client
+cd lecture-progress-tracker
 npm install
 ```
 
@@ -71,7 +71,7 @@ The application will be available at `http://localhost:3000`
 
 - Frontend: React with Material-UI
 - Backend: Node.js with Express
-- Database: MongoDB
+- Database: localstrorage
 - Video Player: ReactPlayer
 
 ## Contributing
