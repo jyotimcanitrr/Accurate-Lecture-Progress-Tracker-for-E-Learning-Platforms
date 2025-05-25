@@ -1,70 +1,65 @@
-# Getting Started with Create React App
+# Lecture Progress Tracker
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React-based application that accurately tracks video lecture progress by monitoring unique watch time. This tool ensures that only genuinely watched content is counted towards progress, preventing false progress indicators from skipping or re-watching content.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+### Accurate Progress Tracking
+- **Unique Watch Time**: Only counts new content watched, not re-watched segments
+- **Interval Merging**: Automatically merges overlapping watch intervals
+- **Skip Prevention**: Doesn't count progress for skipped segments
+- **Non-negative Values**: Ensures progress and watch time are never negative
 
-### `npm start`
+### Progress Persistence
+- Saves watch intervals and progress to localStorage
+- Resumes from last watched position
+- Maintains progress across browser sessions
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### User Interface
+- Clean, modern design with progress bar
+- Real-time progress updates
+- Displays:
+  - Progress percentage
+  - Unique watch time in seconds
+  - Total video duration
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Technical Implementation
 
-### `npm test`
+### Core Functionality
+1. **Watch Interval Tracking**
+   - Records start and end times of watched segments
+   - Handles play, pause, and seek events
+   - Prevents double-counting of watched content
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2. **Progress Calculation**
+   - Merges overlapping intervals
+   - Calculates total unique watch time
+   - Converts to percentage based on video duration
 
-### `npm run build`
+3. **Edge Case Handling**
+   - Manages seeking and skipping
+   - Handles re-watching of content
+   - Ensures non-negative progress values
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Key Components
+- `ProgressTracker.js`: Main component handling video playback and progress tracking
+- `progressService.js`: Manages progress persistence using localStorage
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Usage
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```jsx
+import ProgressTracker from './components/ProgressTracker';
 
-### `npm run eject`
+// In your app
+<ProgressTracker videoId="unique-video-id" />
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Dependencies
+- React
+- No additional external dependencies required
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Browser Support
+- Works in all modern browsers that support HTML5 video and localStorage
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Note
+This implementation focuses on accurate progress tracking and does not include video hosting or streaming functionality. It uses a sample video URL for demonstration purposes.
